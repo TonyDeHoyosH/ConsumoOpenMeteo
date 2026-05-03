@@ -1,170 +1,105 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-
-const PASSWORD_REGEX = /^[0-9a-fA-F]{6,}$/;
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function LoginForm() {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState<'idle'|'loading'|'error'>('idle');
+  const [error, setError] = useState<{message: string} | null>(null);
   const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Frontend validation
-  const passwordError =
-    password.length > 0 && !PASSWORD_REGEX.test(password)
-      ? "La contraseña debe ser hexadecimal (a-f, 0-9) y mínimo 6 caracteres"
-      : null;
+  const isValidHex = (hex: string) => /^[0-9a-fA-F]{6,}$/.test(hex);
 
-  const canSubmit =
-    username.trim().length > 0 &&
-    PASSWORD_REGEX.test(password) &&
-    !isLoading;
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!canSubmit) return;
-
-    setIsLoading(true);
+  const handleLogin = async () => {
+    if (!username || !password || !isValidHex(password)) return;
+    setStatus('loading');
     setError(null);
-
     try {
-      const res = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), password }),
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
       });
-
       if (res.ok) {
-        router.push("/dashboard");
+        router.push('/dashboard');
         router.refresh();
       } else {
-        const data = await res.json();
-        setError(data.message ?? "Error de autenticación");
+        const err = await res.json();
+        setError({ message: err.message || 'Credenciales inválidas' });
+        setStatus('error');
       }
     } catch {
-      setError("No se pudo conectar. Revisa tu conexión.");
-    } finally {
-      setIsLoading(false);
+      setError({ message: 'No se puede conectar. Verifica tu conexión.' });
+      setStatus('error');
     }
-  }
+  };
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
-      <div style={{ marginBottom: "0.375rem" }}>
-        <label
-          htmlFor="username"
-          style={{
-            display: "block",
-            fontSize: "0.7rem",
-            fontFamily: "IBM Plex Mono, monospace",
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-            color: "var(--text-secondary)",
-            marginBottom: "0.5rem",
-          }}
-        >
-          Usuario
-        </label>
-        <input
-          id="username"
-          type="text"
-          className="input-field"
-          placeholder="admin"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          autoComplete="username"
-          autoFocus
-          disabled={isLoading}
-        />
+    <div className="w-full max-w-md p-8 bg-slate-900 border border-slate-800">
+      <div className="text-center mb-8">
+        <h1 className="text-[2.5rem] font-bold text-cyan-400 font-display tracking-tight mb-2 uppercase">
+          Weather Security
+        </h1>
+        <p className="text-slate-400 text-[0.875rem] font-mono">
+          Authentication Portal
+        </p>
       </div>
 
-      <div style={{ marginBottom: "1.5rem", marginTop: "1rem" }}>
-        <label
-          htmlFor="password"
-          style={{
-            display: "block",
-            fontSize: "0.7rem",
-            fontFamily: "IBM Plex Mono, monospace",
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-            color: "var(--text-secondary)",
-            marginBottom: "0.5rem",
-          }}
-        >
-          Contraseña{" "}
-          <span style={{ color: "var(--accent)", opacity: 0.7 }}>
-            (hexadecimal)
-          </span>
-        </label>
-        <input
-          id="password"
-          type="password"
-          className="input-field"
-          placeholder="a1b2c3d4"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          disabled={isLoading}
-          style={
-            passwordError
-              ? { borderColor: "var(--error)" }
-              : {}
-          }
-        />
-        {passwordError && (
-          <p
-            style={{
-              marginTop: "0.375rem",
-              fontSize: "0.72rem",
-              color: "var(--error)",
-            }}
-          >
-            {passwordError}
-          </p>
-        )}
-      </div>
-
-      {error && (
-        <div className="error-box fade-in" style={{ marginBottom: "1.25rem" }}>
-          <span style={{ marginRight: "0.5rem" }}>⚠</span>
-          {error}
+      <div className="space-y-6">
+        <div>
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="w-full px-4 py-2 bg-slate-900 border border-slate-700 text-cyan-400 placeholder-slate-600 focus:outline-none focus:border-cyan-400 font-mono"
+            tabIndex={1}
+          />
         </div>
-      )}
 
-      <button
-        id="login-submit"
-        type="submit"
-        className="btn-primary"
-        disabled={!canSubmit}
-      >
-        {isLoading ? (
-          <span className="loading-pulse">Autenticando...</span>
-        ) : (
-          "→ Iniciar Sesión"
+        <div>
+          <input
+            type="password"
+            placeholder="Password (hexadecimal: a1b2c3d4)"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={`w-full px-4 py-2 bg-slate-900 border text-cyan-400 placeholder-slate-600 focus:outline-none font-mono ${
+              isValidHex(password)
+                ? 'border-cyan-400'
+                : password
+                ? 'border-red-500'
+                : 'border-slate-700'
+            }`}
+            tabIndex={2}
+          />
+          <div className="mt-2 text-[0.75rem] font-mono min-h-[1.25rem]">
+            {password && (
+              <div className={isValidHex(password) ? 'text-cyan-400' : 'text-red-500'}>
+                {isValidHex(password)
+                  ? '✓ Formato hexadecimal válido'
+                  : '✗ Debe ser hexadecimal (a-f, 0-9)'}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-slate-900 border-l-4 border-red-500 p-4 text-red-400 text-[0.875rem] font-mono">
+            {error.message}
+          </div>
         )}
-      </button>
 
-      <div
-        style={{
-          marginTop: "1.25rem",
-          padding: "0.75rem",
-          background: "rgba(34,211,238,0.04)",
-          border: "1px solid rgba(34,211,238,0.1)",
-          borderRadius: "2px",
-          fontSize: "0.72rem",
-          color: "var(--text-secondary)",
-          textAlign: "center",
-        }}
-      >
-        <span style={{ color: "var(--accent)" }}>admin</span>
-        {" / "}
-        <span style={{ color: "var(--accent)", letterSpacing: "0.05em" }}>
-          a1b2c3d4
-        </span>
+        <button
+          onClick={handleLogin}
+          disabled={!username || !password || !isValidHex(password) || status === 'loading'}
+          tabIndex={3}
+          className="w-full py-3 bg-cyan-500 text-slate-950 font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-cyan-400 transition cursor-pointer disabled:cursor-not-allowed font-mono button"
+        >
+          {status === 'loading' ? 'Cargando...' : 'Login'}
+        </button>
       </div>
-    </form>
+    </div>
   );
 }

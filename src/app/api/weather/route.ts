@@ -6,11 +6,21 @@ import {
   OpenMeteoResponseSchema,
 } from "@/lib/weather";
 import { getLocationById, LOCATIONS } from "@/lib/locations";
-
-const TIMEOUT_MS = parseInt(process.env.API_TIMEOUT_MS ?? "3000", 10);
+import { validateEnvVars } from "@/lib/env";
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
+
+  try {
+    validateEnvVars();
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: "Configuration Error", message: e.message },
+      { status: 500 }
+    );
+  }
+
+  const TIMEOUT_MS = parseInt(process.env.API_TIMEOUT_MS ?? "3000", 10);
 
   // ── Auth validation ───────────────────────────────────────────────────────
   const cookieHeader = request.headers.get("cookie");
@@ -44,17 +54,25 @@ export async function GET(request: NextRequest) {
 
   try {
     const url = buildOpenMeteoUrl(location.lat, location.lon);
+    
+    const apiStartTime = Date.now();
     const response = await fetch(url, { signal: controller.signal });
+    const externalApiDurationMs = Date.now() - apiStartTime;
+    
     clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.log(
         JSON.stringify({
           timestamp: new Date().toISOString(),
-          event: "weather_upstream_error",
+          event_type: "weather_api_request",
+          endpoint: "/api/weather",
+          method: "GET",
           status: response.status,
-          location: location.id,
+          success: false,
+          error_type: "network_error",
           duration_ms: Date.now() - startTime,
+          external_api_duration_ms: externalApiDurationMs
         })
       );
       return NextResponse.json(
@@ -75,9 +93,15 @@ export async function GET(request: NextRequest) {
       console.log(
         JSON.stringify({
           timestamp: new Date().toISOString(),
-          event: "weather_schema_error",
-          location: location.id,
+          event_type: "error",
+          endpoint: "/api/weather",
+          method: "GET",
+          status: 502,
+          success: false,
+          error_type: "invalid_schema",
+          detail: "missing_daily_arrays",
           duration_ms: Date.now() - startTime,
+          external_api_duration_ms: externalApiDurationMs
         })
       );
       return NextResponse.json(
@@ -95,11 +119,14 @@ export async function GET(request: NextRequest) {
     console.log(
       JSON.stringify({
         timestamp: new Date().toISOString(),
-        event: "weather_api_request",
+        event_type: "weather_api_request",
+        endpoint: "/api/weather",
+        method: "GET",
         status: 200,
-        location: location.id,
+        success: true,
         duration_ms: Date.now() - startTime,
-        data_points: weatherData.length,
+        external_api_duration_ms: externalApiDurationMs,
+        data_points_received: weatherData.length,
       })
     );
 
@@ -107,15 +134,19 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     clearTimeout(timeoutId);
 
-    const isTimeout =
-      err instanceof Error && err.name === "AbortError";
+    const isTimeout = err instanceof Error && err.name === "AbortError";
 
     console.log(
       JSON.stringify({
         timestamp: new Date().toISOString(),
-        event: isTimeout ? "weather_timeout" : "weather_fetch_error",
-        location: locationId,
+        event_type: "weather_api_request",
+        endpoint: "/api/weather",
+        method: "GET",
+        status: isTimeout ? 504 : 502,
+        success: false,
+        error_type: isTimeout ? "timeout" : "network_error",
         duration_ms: Date.now() - startTime,
+        external_api_duration_ms: TIMEOUT_MS // Aprox para timeout
       })
     );
 

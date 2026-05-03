@@ -4,11 +4,14 @@ import {
   generateToken,
   buildSetCookieHeader,
 } from "@/lib/auth";
+import { validateEnvVars } from "@/lib/env";
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
+    validateEnvVars();
+    
     const body = await request.json();
     const { username, password } = body as {
       username?: string;
@@ -28,7 +31,12 @@ export async function POST(request: NextRequest) {
       console.log(
         JSON.stringify({
           timestamp: new Date().toISOString(),
-          event: "auth_failure",
+          event_type: "auth_attempt",
+          endpoint: "/api/auth",
+          method: "POST",
+          status: 401,
+          success: false,
+          reason: "invalid_credentials",
           duration_ms: Date.now() - startTime,
         })
       );
@@ -48,7 +56,11 @@ export async function POST(request: NextRequest) {
     console.log(
       JSON.stringify({
         timestamp: new Date().toISOString(),
-        event: "auth_success",
+        event_type: "auth_attempt",
+        endpoint: "/api/auth",
+        method: "POST",
+        status: 200,
+        success: true,
         duration_ms: Date.now() - startTime,
       })
     );
@@ -56,9 +68,9 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({ success: true }, { status: 200 });
     response.headers.set("Set-Cookie", cookieHeader);
     return response;
-  } catch {
+  } catch (e: any) {
     return NextResponse.json(
-      { error: "Bad Request", message: "Invalid request body" },
+      { error: "Bad Request", message: e.message || "Invalid request body" },
       { status: 400 }
     );
   }

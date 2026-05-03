@@ -1,150 +1,80 @@
-import type { WeatherDay } from "@/lib/weather";
-
-const ITEMS_PER_PAGE = 3;
-
-function getWeatherIcon(code: number): string {
-  if (code === 0) return "☀️";
-  if (code <= 2) return "🌤️";
-  if (code === 3) return "☁️";
-  if (code <= 48) return "🌫️";
-  if (code <= 67) return "🌧️";
-  if (code <= 77) return "❄️";
-  if (code <= 82) return "🌦️";
-  return "⛈️";
-}
+import { WeatherDay } from '@/lib/weather';
 
 interface WeatherTableProps {
   data: WeatherDay[];
   currentPage: number;
+  itemsPerPage: number;
+  onPageChange: (page: number) => void;
 }
 
-export default function WeatherTable({ data, currentPage }: WeatherTableProps) {
-  if (!data || data.length === 0) {
-    return (
-      <p
-        style={{
-          textAlign: "center",
-          color: "var(--text-secondary)",
-          padding: "2rem",
-        }}
-      >
-        No hay datos disponibles
-      </p>
-    );
-  }
-
-  const startIdx = currentPage * ITEMS_PER_PAGE;
-  const endIdx = startIdx + ITEMS_PER_PAGE;
-  const pageData = data.slice(startIdx, endIdx);
+export default function WeatherTable({ data, currentPage, itemsPerPage, onPageChange }: WeatherTableProps) {
+  const totalPages = Math.ceil(data.length / itemsPerPage);
+  const startIdx = currentPage * itemsPerPage;
+  const endIdx = startIdx + itemsPerPage;
+  const paginatedData = data.slice(startIdx, endIdx);
+  const maxPage = totalPages > 0 ? totalPages - 1 : 0;
 
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table className="weather-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Fecha</th>
-            <th>Condición</th>
-            <th>Temp. Máx.</th>
-            <th>Temp. Mín.</th>
-            <th>Código WMO</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pageData.map((day, i) => {
-            const globalIndex = startIdx + i + 1;
-            const [year, month, dayNum] = day.date.split("-");
-            const formattedDate = `${dayNum}/${month}/${year}`;
-            const tempDelta = day.tempMax - day.tempMin;
-
-            return (
-              <tr key={day.date} className="fade-in">
-                <td>
-                  <span
-                    style={{
-                      fontFamily: "IBM Plex Mono, monospace",
-                      fontSize: "0.75rem",
-                      color: "var(--accent)",
-                      opacity: 0.6,
-                    }}
-                  >
-                    {String(globalIndex).padStart(2, "0")}
-                  </span>
-                </td>
-                <td>
-                  <span
-                    style={{
-                      fontFamily: "IBM Plex Mono, monospace",
-                      fontSize: "0.85rem",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    {formattedDate}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span style={{ fontSize: "1.2rem" }}>
-                      {getWeatherIcon(day.weatherCode)}
-                    </span>
-                    <span style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>
-                      {day.weatherDescription}
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <span
-                    style={{
-                      fontFamily: "IBM Plex Mono, monospace",
-                      fontWeight: 700,
-                      color: day.tempMax > 30 ? "#ff6b6b" : day.tempMax > 20 ? "#22d3ee" : "#a0aec0",
-                    }}
-                  >
-                    {day.tempMax.toFixed(1)}°C
-                  </span>
-                </td>
-                <td>
-                  <span
-                    style={{
-                      fontFamily: "IBM Plex Mono, monospace",
-                      color: "var(--text-secondary)",
-                    }}
-                  >
-                    {day.tempMin.toFixed(1)}°C
-                  </span>
-                </td>
-                <td>
-                  <span
-                    className="badge"
-                    style={{
-                      color: "var(--accent)",
-                      borderColor: "var(--border-accent)",
-                      background: "var(--accent-glow)",
-                    }}
-                  >
-                    WMO-{day.weatherCode}
-                  </span>
-                  {tempDelta > 10 && (
-                    <span
-                      className="badge"
-                      style={{
-                        marginLeft: "0.4rem",
-                        color: "#f59e0b",
-                        borderColor: "rgba(245,158,11,0.3)",
-                        background: "rgba(245,158,11,0.08)",
-                      }}
-                    >
-                      ΔT {tempDelta.toFixed(1)}°
-                    </span>
-                  )}
+    <div className="w-full">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse table">
+          <thead>
+            <tr className="border-b-2 border-cyan-400">
+              <th className="px-4 py-3 text-cyan-400 font-mono whitespace-nowrap">Fecha</th>
+              <th className="px-4 py-3 text-cyan-400 font-mono text-right whitespace-nowrap">Temp Máx</th>
+              <th className="px-4 py-3 text-cyan-400 font-mono text-right whitespace-nowrap">Temp Mín</th>
+              <th className="px-4 py-3 text-cyan-400 font-mono whitespace-nowrap">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginatedData.map((day, idx) => (
+              <tr key={idx} className="border-b border-slate-800 table-row hover:bg-slate-850 transition">
+                <td className="px-4 py-3 text-slate-300 font-mono whitespace-nowrap">{day.date}</td>
+                <td className="px-4 py-3 text-slate-300 font-mono text-right whitespace-nowrap">{day.tempMax.toFixed(1)}°C</td>
+                <td className="px-4 py-3 text-slate-300 font-mono text-right whitespace-nowrap">{day.tempMin.toFixed(1)}°C</td>
+                <td className="px-4 py-3 text-slate-400 font-mono whitespace-nowrap">{day.weatherDescription}</td>
+              </tr>
+            ))}
+            {paginatedData.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-slate-500 font-mono">
+                  No hay datos disponibles
                 </td>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            )}
+          </tbody>
+        </table>
+      </div>
+      
+      {data.length > 0 && (
+        <>
+          <div className="text-center py-4 border-t border-slate-800 text-slate-400 text-sm font-mono">
+            Página {currentPage + 1} de {totalPages} ({data.length} días disponibles)
+          </div>
+          
+          <div className="flex justify-between items-center p-6 border-t border-slate-800">
+            <button
+              aria-label="Cargar página anterior"
+              aria-disabled={currentPage === 0}
+              onClick={() => onPageChange(Math.max(0, currentPage - 1))}
+              disabled={currentPage === 0}
+              className="px-6 py-2 border border-cyan-400 text-cyan-400 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-cyan-400 hover:text-slate-950 transition font-mono button"
+            >
+              ← Anterior
+            </button>
+
+            <button
+              aria-label="Cargar página siguiente"
+              aria-disabled={currentPage === maxPage}
+              onClick={() => onPageChange(Math.min(maxPage, currentPage + 1))}
+              disabled={currentPage === maxPage}
+              className="px-6 py-2 border border-cyan-400 text-cyan-400 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-cyan-400 hover:text-slate-950 transition font-mono button"
+            >
+              Siguiente →
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
-
-export { ITEMS_PER_PAGE };

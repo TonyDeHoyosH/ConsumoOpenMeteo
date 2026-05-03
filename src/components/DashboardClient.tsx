@@ -1,186 +1,123 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import LocationSelector from "./LocationSelector";
-import WeatherTable, { ITEMS_PER_PAGE } from "./WeatherTable";
-import Pagination from "./Pagination";
-import { WeatherDay } from "@/lib/weather";
-import { LOCATIONS } from "@/lib/locations";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { WeatherDay } from '@/lib/weather';
+import { LOCATIONS } from '@/lib/locations';
+import WeatherTable from './WeatherTable';
+import LocationSelector from './LocationSelector';
+
+interface DashboardState {
+  data: WeatherDay[];
+  currentPage: number;
+  itemsPerPage: number;
+  status: 'idle' | 'loading' | 'error' | 'success';
+  error: { message: string } | null;
+}
 
 export default function DashboardClient() {
   const router = useRouter();
-  const [locationId, setLocationId] = useState(LOCATIONS[0].id);
-  const [data, setData] = useState<WeatherDay[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(0);
+  const [selectedLocation, setSelectedLocation] = useState(LOCATIONS[0].id);
+  const [state, setState] = useState<DashboardState>({
+    data: [],
+    currentPage: 0,
+    itemsPerPage: 3,
+    status: 'idle',
+    error: null,
+  });
 
-  useEffect(() => {
-    async function fetchData() {
-      setIsLoading(true);
-      setError(null);
-      // Reset pagination when location changes
-      setCurrentPage(0);
-
-      try {
-        const res = await fetch(`/api/weather?locationId=${locationId}`);
-        
+  const fetchData = async () => {
+    setState(s => ({ ...s, status: 'loading', error: null }));
+    try {
+      const location = LOCATIONS.find(l => l.id === selectedLocation)!;
+      const res = await fetch(`/api/weather?lat=${location.lat}&lon=${location.lon}`);
+      if (!res.ok) {
         if (res.status === 401) {
-          router.push("/login");
+          router.push('/login');
           return;
         }
-
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.message || "Error al cargar datos");
-        }
-
-        const json = await res.json();
-        setData(json);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Error desconocido");
-        setData(null);
-      } finally {
-        setIsLoading(false);
+        throw new Error('Error al obtener datos');
       }
+      const data = await res.json();
+      setState(s => ({ ...s, data, currentPage: 0, status: 'success' }));
+    } catch (e: any) {
+      setState(s => ({ ...s, status: 'error', error: { message: e.message || 'Error desconocido' } }));
     }
+  };
 
+  useEffect(() => {
     fetchData();
-  }, [locationId, router]);
+  }, [selectedLocation]);
 
-  async function handleLogout() {
-    setIsLoggingOut(true);
-    try {
-      await fetch("/api/logout", { method: "POST" });
-      router.push("/login");
-      router.refresh();
-    } catch (err) {
-      console.error("Logout failed", err);
-      setIsLoggingOut(false);
-    }
-  }
+  const handleLogout = async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    router.push('/login');
+    router.refresh();
+  };
 
-  // Calculate pagination
-  const totalItems = data ? data.length : 0;
-  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const activeLocation = LOCATIONS.find(l => l.id === selectedLocation)!;
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header
-        style={{
-          borderBottom: "1px solid var(--border)",
-          background: "var(--bg-secondary)",
-          padding: "1rem 2rem",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <div
-            style={{
-              width: "28px",
-              height: "28px",
-              background: "var(--accent)",
-              borderRadius: "2px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0a0e27" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-            </svg>
-          </div>
-          <h1
-            className="glow-text"
-            style={{ fontSize: "1.25rem", margin: 0, color: "var(--accent)" }}
-          >
-            MeteoProxy
-          </h1>
-        </div>
-
-        <button
-          onClick={handleLogout}
-          className="btn-ghost"
-          disabled={isLoggingOut}
-          style={{ padding: "0.4rem 0.75rem", fontSize: "0.7rem" }}
-        >
-          {isLoggingOut ? "Saliendo..." : "Cerrar Sesión ⏏"}
-        </button>
-      </header>
-
-      {/* ── Main Content ───────────────────────────────────────────────── */}
-      <main style={{ flex: 1, padding: "2rem", maxWidth: "1000px", margin: "0 auto", width: "100%" }}>
-        
-        {/* Toolbar */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-end",
-            marginBottom: "2rem",
-            flexWrap: "wrap",
-            gap: "1rem"
-          }}
-        >
+    <div className="w-full max-w-5xl mx-auto p-4 sm:p-6 lg:p-8 dashboard">
+      <header className="border-b border-slate-800 p-6 mb-6">
+        <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h2 style={{ fontSize: "1.75rem", margin: "0 0 0.5rem 0", color: "var(--text-primary)" }}>
-              Reporte de 7 Días
-            </h2>
-            <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: "0.85rem" }}>
-              Datos extraídos de Open-Meteo vía proxy inverso
+            <h1 className="text-3xl font-bold text-cyan-400 font-display">
+              WEATHER DASHBOARD
+            </h1>
+            <p className="text-slate-400 text-sm mt-2 font-mono">
+              {activeLocation.name} ({activeLocation.lat}°N, {activeLocation.lon}°W)
             </p>
           </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <LocationSelector 
+              selected={selectedLocation} 
+              onChange={setSelectedLocation} 
+            />
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 border border-cyan-400 text-cyan-400 hover:bg-cyan-400 hover:text-slate-950 transition font-mono"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </header>
 
-          <LocationSelector
-            selectedId={locationId}
-            onChange={setLocationId}
-            disabled={isLoading}
+      {state.status === 'loading' && (
+        <div className="flex justify-center items-center h-96">
+          <div className="text-center">
+            <div className="inline-block animate-spin mb-4 text-cyan-400 text-4xl font-mono">
+              ⟳
+            </div>
+            <p className="text-slate-400 font-mono">Cargando datos meteorológicos...</p>
+          </div>
+        </div>
+      )}
+
+      {state.status === 'error' && (
+        <div className="bg-slate-900 border-l-4 border-red-500 p-6 m-6">
+          <h3 className="text-red-400 font-bold mb-2 font-mono">Error</h3>
+          <p className="text-red-300 mb-4 font-mono">{state.error?.message || 'El servicio está lento...'}</p>
+          <button
+            onClick={fetchData}
+            className="px-4 py-2 border border-red-500 text-red-400 hover:bg-red-500 hover:text-slate-950 transition font-mono"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
+      {state.status === 'success' && (
+        <div className="data-table">
+          <WeatherTable 
+            data={state.data} 
+            currentPage={state.currentPage} 
+            itemsPerPage={state.itemsPerPage} 
+            onPageChange={(page) => setState(s => ({ ...s, currentPage: page }))}
           />
         </div>
-
-        {/* Data Card */}
-        <div className="card" style={{ overflow: "hidden" }}>
-          
-          {error ? (
-            <div style={{ padding: "3rem 2rem", textAlign: "center" }}>
-               <div className="error-box" style={{ display: "inline-block", maxWidth: "400px" }}>
-                  <span style={{ display: "block", fontSize: "2rem", marginBottom: "0.5rem" }}>⚠️</span>
-                  {error}
-               </div>
-            </div>
-          ) : isLoading ? (
-             <div style={{ padding: "3rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-                <div className="skeleton" style={{ height: "40px", width: "100%" }} />
-                <div className="skeleton" style={{ height: "60px", width: "100%" }} />
-                <div className="skeleton" style={{ height: "60px", width: "100%" }} />
-                <div className="skeleton" style={{ height: "60px", width: "100%" }} />
-             </div>
-          ) : data ? (
-            <>
-              <WeatherTable data={data} currentPage={currentPage} />
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPrev={() => setCurrentPage(p => Math.max(0, p - 1))}
-                onNext={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
-                totalItems={totalItems}
-                itemsPerPage={ITEMS_PER_PAGE}
-              />
-            </>
-          ) : null}
-          
-        </div>
-      </main>
+      )}
     </div>
   );
 }
