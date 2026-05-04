@@ -1,4 +1,4 @@
-// Using Web Crypto API for Edge Runtime compatibility
+import { validateUserCredentials } from "./users";
 
 const PASSWORD_REGEX = /^[0-9a-fA-F]{6,}$/;
 
@@ -6,13 +6,8 @@ export function validateCredentials(
   username: string,
   password: string
 ): boolean {
-  const validUser = process.env.MOCK_USERNAME ?? "admin";
-  const validPass = process.env.MOCK_PASSWORD_HEX ?? "";
-
   if (!PASSWORD_REGEX.test(password)) return false;
-  if (username !== validUser) return false;
-  if (password !== validPass) return false;
-  return true;
+  return validateUserCredentials(username, password);
 }
 
 export function generateToken(): string {
