@@ -70,9 +70,9 @@ export default function DashboardClient() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <LocationSelector 
-              selected={selectedLocation} 
-              onChange={setSelectedLocation} 
+            <LocationSelector
+              selected={selectedLocation}
+              onChange={setSelectedLocation}
             />
             <button
               onClick={handleLogout}
@@ -110,10 +110,10 @@ export default function DashboardClient() {
 
       {state.status === 'success' && (
         <div className="data-table">
-          <WeatherTable 
-            data={state.data} 
-            currentPage={state.currentPage} 
-            itemsPerPage={state.itemsPerPage} 
+          <WeatherTable
+            data={state.data}
+            currentPage={state.currentPage}
+            itemsPerPage={state.itemsPerPage}
             onPageChange={(page) => setState(s => ({ ...s, currentPage: page }))}
           />
         </div>
